@@ -77,7 +77,8 @@ begin
   if(!RSTn)
     outshiftreg  <=  16'h0000;
   else if(newtrans)
-    outshiftreg  <=  audmem[audptr];
+   //outshiftreg  <=  audmem[audptr];
+    outshiftreg <= 16'h8888;
   else if(shiftout)
     outshiftreg  <=  {outshiftreg[14:0], outshiftreg[15]};
 end
