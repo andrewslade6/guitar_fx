@@ -7,11 +7,14 @@ reg [2:0] channel;
 wire cnv_complete, MOSI, MISO, SCLK, SS_n;
 wire [11:0] result;
 
+
 adc_spi SPI_MODULE(clk, rst_n, channel, start_cnv, result, cnv_complete, MISO, MOSI, SCLK, SS_n);
 ADC128S ADC_MODULE(clk, rst_n, SS_n, SCLK, MISO, MOSI);
 
 
 initial begin
+	$display ("channel_num[2] = %b", channel_num[2]);
+
 	channel = 3'b001;
 	rst_n = 0;
 	start_cnv = 0;

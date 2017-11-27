@@ -190,18 +190,18 @@ always_ff @(posedge clk, negedge rst_n) begin
 		out_to_codec <= {out_to_codec[14:0], 1'b0};
 end
 
-//assign SD_in = out_to_codec[15];
+assign SD_in = out_to_codec[15];
 /////////////////// TESTING ////////////////////
 
-reg out_test;
+// reg out_test;
 
-always_ff @(posedge clk, negedge rst_n) begin
-	if(~rst_n)
-		out_test <= 1'b0;
-	else if(SCLK_fall)						//out to dac
-		out_test <= ~out_test;
-end
-assign SD_in = out_test;
+// always_ff @(posedge clk, negedge rst_n) begin
+// if(~rst_n)
+// 	out_test <= 1'b0;
+// else if(SCLK_fall)						//out to dac
+// 	out_test <= ~out_test;
+// end
+// assign SD_in = out_test;
 //////////////////////////////////////////////////
 
 

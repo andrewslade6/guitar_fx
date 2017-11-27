@@ -1,13 +1,15 @@
 module adc_spi (clk, rst_n, channel, start_cnv, result, cnv_complete, MISO, MOSI, SCLK, SS_n);
 
 input clk, rst_n, channel, start_cnv, MISO;
-output result, cnv_complete, MOSI, SCLK, SS_n;
+output result, cnv_complete, MOSI, SCLK;
+
+output reg SS_n;
 
 //inputs and output type definitions
 wire clk, rst_n, start_cnv, MISO;
 reg [2:0] channel;
 reg [11:0] result;
-reg MOSI, SS_n, done;
+reg MOSI, done;
 
 
 //internal signals
@@ -16,6 +18,7 @@ reg [4:0] sclk_counter; 	//count 32 system clks
 reg [4:0] bit_count; 		//count 16 SCLKs, need 4 bits to count 0-16
 reg [1:0] two_clk_delay;
 reg SCLK_rise, SCLK_fall, SCLK_ff1, SCLK_ff2, cnv_complete, shift_last_bit;
+reg set_SS_n, clear_SS_n;
 
 
 typedef enum reg[2:0] {IDLE, SEND_ADDRESS, GET_ADC_DATA, LAST_SHIFT} state_t;
@@ -80,7 +83,8 @@ always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n)
 		tx_register <= 16'h0000;
 	else if(start_cnv)
-		tx_register <= {2'b0, channel, 11'b0};
+		//tx_register <= {2'b0, channel, 11'b0};
+		tx_register <= 16'h0000;
 	else if( two_clk_delay[1])
 		tx_register <= {tx_register[14:0], 1'b0};
 end
@@ -112,27 +116,29 @@ always_comb begin
 	done = 1'b0; 
 	shift_last_bit = 1'b0;
 	next_state = IDLE;
-	SS_n = 1'b1;
+	set_SS_n = 1'b0;
+	clear_SS_n = 1'b0;
 	
 	case (state)
 		IDLE :	begin 
 				if (start_cnv) begin
 					next_state = SEND_ADDRESS;
+					clear_SS_n = 1'b1;
 				end
 			end
 
 		SEND_ADDRESS : 	begin
 				next_state = SEND_ADDRESS;
-				SS_n = 1'b0;
+				//SS_n = 1'b0;
 				if (bit_count == 5'h10) begin
-					SS_n = 1'b1; // deselect chip briefly
+					//SS_n = 1'b1; // deselect chip briefly
 					next_state = GET_ADC_DATA;
 				end
 			end
 
 		GET_ADC_DATA :  begin
 				next_state = GET_ADC_DATA;
-				SS_n = 1'b0;	
+				//SS_n = 1'b0;	
 				if (bit_count == 5'h10) begin
 					//done = 1'b1;
 					next_state = LAST_SHIFT;
@@ -141,12 +147,13 @@ always_comb begin
 
 		LAST_SHIFT : begin
 				next_state = LAST_SHIFT;
-				SS_n = 1'b0;
+				//SS_n = 1'b0;
 				if (sclk_counter == 5'h14) begin // wait 1/8 SCLK and shift in last
 					shift_last_bit = 1'b1;
 				end 
 				else if (sclk_counter == 5'h18) begin
 					next_state = IDLE;
+					set_SS_n = 1'b1;
 					done = 1'b1;
 				end
  			end
@@ -155,6 +162,15 @@ always_comb begin
 
 end
 
+
+always_ff @(posedge clk, negedge rst_n) begin
+	if (!rst_n)
+		SS_n <= 1'b1;
+	else if (clear_SS_n)
+		SS_n <= 1'b0;
+	else if (set_SS_n)
+		SS_n <= 1'b1;
+end
 
 // conversion complete logic
 always_ff @(posedge clk, negedge rst_n) begin

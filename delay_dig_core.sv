@@ -4,51 +4,108 @@ input clk, rst_n, VALID, left_in, right_in;
 output left_out, right_out;
 
 wire clk, rst_n, VALID;
-wire[15:0] left_in, right_in;
+wire[15:0] left_in, right_in, d_out;
 reg[15:0] left_out, right_out;
+
+/////////////INTERNAL SIGNALS//////////////
+
+reg[15:0] delay_path, input_buffer, d_in, wet;
+wire[15:0] r_addr, w_addr;
+
+reg w_en, NOTFIRSTTIME, update_addr;
+
+//////////////////////////////////////////
+
 
 memory_mod delay_mem(w_en, d_in, d_out, r_addr, w_addr, clk, rst_n);
 
-reg[15:0] delay_path;
-reg[15:0] input_buffer;
-reg[13:0] delay_addresses; 
-reg read_flag;
+reg[14:0] delay_address, delay_time;
 
-//average of left and right input paths for mono signal
-assign input_buffer[15:0] = (left_in + right_in) / 2;
-
-//delay path values 1/2 as loud as input
+assign delay_time = 15'd19279;
 //TODO: link with decay slider
-assign delay_path[15:0] ? (read_flag) = d_out>>1 : 16'h0000;
-assign w_addr = delay_addresses;
-assign r_addr = delay_addresses;
+assign w_addr[15:0] = delay_address;
+assign r_addr[15:0] = delay_address;
 
 
-// talkthrough flop logic
+reg valid_ff1, valid_ff2;
+wire valid_fall;
+
+//edge detection for valid
+always_ff @(posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+		valid_ff1 <= 1'b0;
+		valid_ff2 <= 1'b0;
+	end else begin
+		valid_ff1 <= VALID;
+		valid_ff2 <= valid_ff1;
+	end  
+end
+//edge detection on valid
+assign valid_fall = ~valid_ff1 & valid_ff2;
+assign valid_rise = valid_ff1 & ~valid_ff2;
+
+//flop logic
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n) begin
-		left_out  <= 16'h0000;
-		right_out <= 16'h0000;
-		delay_addresses <= 13'h0;
+		input_buffer 	<= 16'h0000;
+		d_in[15:0] 		<= 16'h0000;	
+		wet 			<= 16'h0000;
+		left_out  		<= 16'h0000;
+		right_out 		<= 16'h0000;
 	end
 	else if(VALID) begin
-		if(~read_flag)
-			w_en = 1'b1;
-
-		delay_addresses = delay_addresses + 1;
-		d_in <= input_buffer;
-		left_out  <= input_buffer + delay_path;
-		right_out <= input_buffer + delay_path;
+		input_buffer  <= ((left_in + right_in));
+		d_in[15:0] <= input_buffer;
+		wet <= (delay_path + input_buffer);
+		left_out  <= wet;
+		right_out <= wet;
 	end
 end
 
+//delay path sampled on rising edge of valid
 always_ff @(posedge clk or negedge rst_n) begin
-	if(~rst_n) 
-		read_flag <= 0;
-	else if (delay_addresses == 14'd16383)
-		read_flag <= 1;
+	if(~rst_n)
+		delay_path <= 16'h0000;
+	else if(valid_rise && NOTFIRSTTIME)
+		delay_path <= d_out;
 end
 
+
+//update memory location with current 16 bit word
+always_ff @(posedge clk or negedge rst_n) begin
+	if(~rst_n)
+		w_en <= 0;
+	else if(valid_fall)
+		w_en <= 1;
+	else
+		w_en <= 0;
+end
+
+// update delay_address 1 clock after valid falls
+always_ff @(posedge clk or negedge rst_n) begin
+	if(~rst_n)
+		update_addr <= 0;
+	else if(valid_fall)
+		update_addr <= 1;
+	else
+		update_addr <= 0;
+end
+
+//update memory location address
+always_ff @(posedge clk or negedge rst_n) begin
+	if(~rst_n) begin
+		delay_address <= 15'h0000;
+		NOTFIRSTTIME  <= 1'b0;
+	end
+	else if(update_addr) begin
+		 	if(delay_address == delay_time) begin // NEED TO CHANGE DYNAMICALLLY
+				delay_address <= 15'h0000;
+				NOTFIRSTTIME  <= 1'b1;
+			end
+		 	else
+		 		delay_address <= delay_address + 1;
+	end
+end
 
 
 endmodule

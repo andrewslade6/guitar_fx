@@ -10,7 +10,7 @@ wire[15:0] left_out, right_out;
 wire LRCLK, SCLK, MCLK, RST_n, SD_in, VALID;
 wire[15:0] left_in, right_in, aout_lft, aout_rht;
 
-fake_dig_core fdc(.clk(clk), .rst_n(rst_n), .VALID(VALID), .left_in(left_in),
+delay_dig_core fdc(.clk(clk), .rst_n(rst_n), .VALID(VALID), .left_in(left_in),
 	.right_in(right_in), .left_out(left_out), .right_out(right_out));
 
 codec_interface CODEC_INT(.clk(clk), .rst_n(rst_n), .SD_out(SD_out), 
@@ -26,7 +26,7 @@ initial begin
 
 	#10 rst_n = 1;
 
-	#40960;
+	#4096000000;
 
 	$stop;
 end
