@@ -16,15 +16,36 @@ localparam CHNL_5 = 3'b111;
 reg [2:0] channels [0:5] = '{CHNL_0, CHNL_1, CHNL_2, CHNL_3, CHNL_4, CHNL_5};
 reg [2:0] channel_num;
 //reg [11:0] pot_0, pot_1, pot_2, pot_3, pot_4, pot_5;
-reg [1:0] clk_counter;
 reg [2:0] channel;
-wire clk, rst_n, start_cnv, cnv_complete;
+wire clk, rst_n, cnv_complete;
 wire [11:0] result;
+reg start_first_time, start_cnv, conv_ff1, conv_ff2, conv_fall, conv_rise, not_first_conv;
+reg [2:0] startup_delay;
 
-adc_spi SPI_MODULE(clk, rst_n, channel, start_cnv, result, cnv_complete, MISO, MOSI, SCLK, SS_n);
-//ADC128S ADC_MODULE(clk, rst_n, SS_n, SCLK, MISO, MOSI);
+spi_master SPI_MODULE(clk, rst_n, channel, start_cnv, result, cnv_complete, MISO, MOSI, SCLK, SS_n);
 
-reg first_conversion_flag;
+
+//edge detection for cnv_complete
+always_ff @(posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+		conv_ff1 <= 1'b1;
+		conv_ff2 <= 1'b1;
+	end else begin
+	    conv_ff1 <= cnv_complete;
+		conv_ff2 <= conv_ff1;
+	end  
+end
+//negedge detection on SCLK
+assign conv_fall = ~conv_ff1 & conv_ff2;
+//posedge detection on SCLK
+assign conv_rise = conv_ff1 & ~conv_ff2;
+
+always_ff @(posedge clk, negedge rst_n) begin
+	if(~rst_n) 	
+		not_first_conv <= 1'b0; //reset channel to zero at start of transmission
+	else if (conv_rise)
+		not_first_conv <= 1'b1;
+end
 
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n) 	
@@ -33,62 +54,66 @@ always_ff @(posedge clk, negedge rst_n) begin
 		channel <= channels[channel_num];
 end
 
+// starts the very first conversion
+always_ff @(posedge clk, negedge rst_n) begin
+	if(~rst_n)
+		startup_delay <= 3'b000; 
+	else
+		startup_delay <= startup_delay + 1;
+end
 
-// counts four clocks when converion is done to change channel
-// and start the next converstion process
+always_ff @(posedge clk or negedge rst_n) begin
+	if(~rst_n)
+		start_first_time <= 1'b0;
+	else if (startup_delay == 3'b111)
+		start_first_time <= 1'b1;
+end
+
+
+// starts a new conversion when cnv_complete
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n) 	
-		clk_counter <= 2'b00;
-	else if (cnv_complete || ~first_conversion_flag)
-		clk_counter <= clk_counter + 1;
+		start_cnv <= 1'b0; 
+	else if (startup_delay[2] && !start_first_time)
+		start_cnv <= 1'b1;
+	else if (conv_rise)
+		start_cnv <= 1'b1;
 	else
-		clk_counter <= 2'b00;
+		start_cnv <= 1'b0;
 end
 
 
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n) begin 		// clear pot values on reset
-		pot_0 <= 12'h0000;
-		pot_1 <= 12'h0000;
-		pot_2 <= 12'h0000;
-		pot_3 <= 12'h0000;
-		pot_4 <= 12'h0000;
-		pot_5 <= 12'h0000;	
+		pot_0 <= 12'h000;
+		pot_1 <= 12'h000;
+		pot_2 <= 12'h000;
+		pot_3 <= 12'h000;
+		pot_4 <= 12'h000;
+		pot_5 <= 12'h000;	
 	end
-	else if (cnv_complete && clk_counter == 0) begin
+	else if (conv_rise & not_first_conv) begin
 		case (channel)
-			CHNL_0 : pot_0 <= result;
-			CHNL_1 : pot_1 <= result;
-			CHNL_2 : pot_2 <= result;
-			CHNL_3 : pot_3 <= result;
-			CHNL_4 : pot_4 <= result;
-			CHNL_5 : pot_5 <= result;
+			CHNL_0 : pot_5 <= result;
+			CHNL_1 : pot_0 <= result;
+			CHNL_2 : pot_1 <= result;
+			CHNL_3 : pot_2 <= result;
+			CHNL_4 : pot_3 <= result;
+			CHNL_5 : pot_4 <= result;
 		endcase
 	end
 end
 
-
-// increment the channel number two clocks after converstion complete
+// increment channel pointer
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n) 	
-		channel_num <= 3'b000; //reset channel to 6 to wrap around after reset
-	else if(clk_counter == 2'b10 && first_conversion_flag)
-		 if(channel_num == 3'b101)
-			channel_num <= 3'b00;
+		channel_num <= 3'b000; 
+	else if (conv_rise)
+		 if (channel_num == 3'b101)
+			 channel_num <= 3'b000;
 		 else
-			channel_num <= channel_num + 1;
+			 channel_num <= channel_num + 1;
 end
-
-always_ff @(posedge clk or negedge rst_n) begin
-	if(~rst_n) begin
-		first_conversion_flag <= 0;
-	end else if(clk_counter == 2'b11) begin
-		first_conversion_flag <= 1;
-	end
-end
-
-assign start_cnv = (clk_counter == 2'b11) ? 1'b1 : 1'b0;
-
 
 
 

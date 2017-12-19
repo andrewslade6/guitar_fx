@@ -15,7 +15,7 @@ reg MOSI, done;
 //internal signals
 reg [15:0] tx_register, rx_register; //transmit and receive shift registers
 reg [4:0] sclk_counter; 	//count 32 system clks
-reg [4:0] bit_count; 		//count 16 SCLKs, need 4 bits to count 0-16
+reg [4:0] bit_count; 		//count 16 SCLKs, need 5 bits to count 0-16
 reg [1:0] two_clk_delay;
 reg SCLK_rise, SCLK_fall, SCLK_ff1, SCLK_ff2, cnv_complete, shift_last_bit;
 reg set_SS_n, clear_SS_n;
@@ -57,7 +57,7 @@ assign SCLK_rise = SCLK_ff1 & ~SCLK_ff2;
 always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n)
 		bit_count <= 0;
-	else if(SS_n)	//reset to zero when
+	else if(set_SS_n)	//reset to zero when
 		bit_count <= 0;
 	else if(SCLK_rise) 
 		bit_count <= bit_count + 1;
@@ -83,9 +83,9 @@ always_ff @(posedge clk, negedge rst_n) begin
 	if(~rst_n)
 		tx_register <= 16'h0000;
 	else if(start_cnv)
-		//tx_register <= {2'b0, channel, 11'b0};
-		tx_register <= 16'h0000;
-	else if( two_clk_delay[1])
+		tx_register <= {2'b0, channel, 11'b0};
+		//tx_register <= 16'h0000;
+	else if(two_clk_delay[1])
 		tx_register <= {tx_register[14:0], 1'b0};
 end
 
@@ -132,13 +132,14 @@ always_comb begin
 				//SS_n = 1'b0;
 				if (bit_count == 5'h10) begin
 					//SS_n = 1'b1; // deselect chip briefly
+					set_SS_n = 1'b1;
 					next_state = GET_ADC_DATA;
 				end
 			end
 
 		GET_ADC_DATA :  begin
 				next_state = GET_ADC_DATA;
-				//SS_n = 1'b0;	
+				clear_SS_n = 1'b1;	
 				if (bit_count == 5'h10) begin
 					//done = 1'b1;
 					next_state = LAST_SHIFT;

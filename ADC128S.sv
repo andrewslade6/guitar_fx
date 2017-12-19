@@ -53,9 +53,9 @@ module ADC128S(clk,rst_n,SS_n,SCLK,MISO,MOSI);
 	
   always_ff @(posedge clk, negedge rst_n)
     if (!rst_n)
-	  value <= 12'h505;
+	  value <= 12'hFFF;
 	else if (dec_value)
-	  value <= value - 12'h010;
+	  value <= value - 12'h111;
 	  
   //// Infer state register next ////
   always_ff @(posedge clk, negedge rst_n)
