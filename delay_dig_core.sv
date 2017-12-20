@@ -1,7 +1,9 @@
-module delay_dig_core(clk, rst_n, VALID, left_in, right_in, left_out, right_out, d_vol_slider, f_vol_slider, d_time_slider);
+
+
+module delay_dig_core(clk, rst_n, VALID, left_in, right_in, left_out, d_vol_slider, f_vol_slider, d_time_slider);
 
 input clk, rst_n, VALID, left_in, right_in, d_vol_slider, f_vol_slider, d_time_slider;
-output left_out, right_out;
+output left_out;
 
 wire clk, rst_n, VALID;
 wire[15:0] left_in, right_in, d_out;
@@ -65,11 +67,11 @@ always_ff @(posedge clk, negedge rst_n) begin
 		right_out 		<= 16'h0000;
 	end
 	else if(VALID) begin
-		input_buffer  	<= left_in + right_in;
+		input_buffer  	<= left_in;
 		d_in[15:0] 		<= input_buffer + feedback[27:12];
 		wet 			<= input_buffer + delay_path[27:12];
 		left_out  		<= wet;
-		right_out 		<= wet;
+		//right_out 		<= wet; MONO OUT
 	end
 end
 

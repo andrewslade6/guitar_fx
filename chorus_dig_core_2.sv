@@ -1,7 +1,9 @@
-module chorus_dig_core_2(clk, rst_n, VALID, left_in, right_in, left_out, right_out, flange_vol_slider, rate_slider);
+
+
+module chorus_dig_core_2(clk, rst_n, VALID, left_in, right_in, left_out, flange_vol_slider, rate_slider);
 
 input clk, rst_n, VALID, left_in, right_in, flange_vol_slider, rate_slider;
-output left_out, right_out;
+output left_out;
 
 
 wire clk, rst_n, VALID;
@@ -78,13 +80,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 		right_out 		<= 16'h0000;
 	end
 	else if(VALID) begin
-		input_buffer 	 <= (left_in + right_in);
+		input_buffer 	 <= left_in;
 		circ_buff[index] <= input_buffer;
 		delayed_to_mult  <= circ_buff[(index + delay_samples)];
-		//left_out  		 <= input_buffer;
-		//right_out 		 <= input_buffer;
 		left_out  		 <= input_buffer + scaled_buffer;
-		right_out 		 <= input_buffer + scaled_buffer;
+		//right_out 		 <= input_buffer + scaled_buffer;  MONO OUT
 	end
 end
 
